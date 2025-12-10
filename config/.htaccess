@@ -1,0 +1,4 @@
+# Protéger le dossier config
+Order deny,allow
+Deny from all
+

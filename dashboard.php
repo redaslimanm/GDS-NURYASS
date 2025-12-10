@@ -1,0 +1,321 @@
+<?php
+/**
+ * Dashboard - Page d'accueil
+ * GDS - Stock Management System
+ */
+
+require_once 'includes/session.php';
+require_once 'config/database.php';
+
+// Vérifier la connexion
+requireLogin('login.php');
+
+$pageTitle = 'Dashboard';
+
+// Récupérer les statistiques
+try {
+    $pdo = getDBConnection();
+    
+    // Nombre de clients
+    $stmt = $pdo->query("SELECT COUNT(*) FROM clients WHERE actif = 1");
+    $totalClients = $stmt->fetchColumn();
+    
+    // Nombre de produits
+    $stmt = $pdo->query("SELECT COUNT(*) FROM produits WHERE actif = 1");
+    $totalProduits = $stmt->fetchColumn();
+    
+    // Produits en stock faible (inférieur au stock minimum)
+    $stmt = $pdo->query("SELECT COUNT(*) FROM produits WHERE stock <= stock_minimum AND actif = 1");
+    $produitsStockFaible = $stmt->fetchColumn();
+    
+    // Nombre de bons non payés (crédits)
+    $stmt = $pdo->query("SELECT COUNT(*) FROM bons WHERE statut_paiement = 'non_paye'");
+    $bonsNonPayes = $stmt->fetchColumn();
+    
+    // Montant total des crédits
+    $stmt = $pdo->query("SELECT COALESCE(SUM(montant_actuel), 0) FROM credits WHERE statut = 'actif'");
+    $totalCredits = $stmt->fetchColumn();
+    
+    // Nombre de factures ce mois
+    $stmt = $pdo->query("SELECT COUNT(*) FROM factures WHERE MONTH(date_facture) = MONTH(CURRENT_DATE()) AND YEAR(date_facture) = YEAR(CURRENT_DATE())");
+    $facturesMois = $stmt->fetchColumn();
+    
+    // Total des ventes ce mois
+    $stmt = $pdo->query("SELECT COALESCE(SUM(total), 0) FROM factures WHERE MONTH(date_facture) = MONTH(CURRENT_DATE()) AND YEAR(date_facture) = YEAR(CURRENT_DATE())");
+    $ventesMois = $stmt->fetchColumn();
+    
+    // Bons du jour
+    $stmt = $pdo->query("SELECT COUNT(*) FROM bons WHERE DATE(date_bon) = CURDATE()");
+    $bonsAujourdhui = $stmt->fetchColumn();
+    
+    // Derniers bons
+    $stmt = $pdo->prepare("
+        SELECT b.*, c.nom, c.prenom, c.nom_entreprise, c.type_client
+        FROM bons b
+        LEFT JOIN clients c ON b.client_id = c.id
+        ORDER BY b.date_bon DESC
+        LIMIT 5
+    ");
+    $stmt->execute();
+    $derniersBons = $stmt->fetchAll();
+    
+    // Derniers clients
+    $stmt = $pdo->query("
+        SELECT * FROM clients 
+        WHERE actif = 1 
+        ORDER BY date_creation DESC 
+        LIMIT 5
+    ");
+    $derniersClients = $stmt->fetchAll();
+    
+} catch (PDOException $e) {
+    error_log("Erreur dashboard: " . $e->getMessage());
+    $totalClients = $totalProduits = $produitsStockFaible = $bonsNonPayes = 0;
+    $totalCredits = $facturesMois = $ventesMois = $bonsAujourdhui = 0;
+    $derniersBons = $derniersClients = [];
+}
+
+require_once 'includes/header.php';
+?>
+
+<div class="top-bar">
+    <div>
+        <h1 class="page-title">Dashboard</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item active" aria-current="page">Accueil</li>
+            </ol>
+        </nav>
+    </div>
+    <div>
+        <span class="text-muted">
+            <i class="bi bi-calendar3 me-2"></i>
+            <?php echo date('d/m/Y'); ?>
+        </span>
+    </div>
+</div>
+
+<!-- Statistiques -->
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="stat-card primary">
+            <div class="stat-icon">
+                <i class="bi bi-people"></i>
+            </div>
+            <div class="stat-value"><?php echo number_format($totalClients); ?></div>
+            <div class="stat-label">Clients Actifs</div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card success">
+            <div class="stat-icon">
+                <i class="bi bi-box"></i>
+            </div>
+            <div class="stat-value"><?php echo number_format($totalProduits); ?></div>
+            <div class="stat-label">Produits</div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card warning">
+            <div class="stat-icon">
+                <i class="bi bi-exclamation-triangle"></i>
+            </div>
+            <div class="stat-value"><?php echo number_format($produitsStockFaible); ?></div>
+            <div class="stat-label">Stock Faible</div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card danger">
+            <div class="stat-icon">
+                <i class="bi bi-credit-card"></i>
+            </div>
+            <div class="stat-value"><?php echo number_format($totalCredits, 2); ?> DH</div>
+            <div class="stat-label">Total Crédits</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="stat-card info">
+            <div class="stat-icon">
+                <i class="bi bi-receipt"></i>
+            </div>
+            <div class="stat-value"><?php echo number_format($bonsNonPayes); ?></div>
+            <div class="stat-label">Bons Non Payés</div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card success">
+            <div class="stat-icon">
+                <i class="bi bi-file-earmark-text"></i>
+            </div>
+            <div class="stat-value"><?php echo number_format($facturesMois); ?></div>
+            <div class="stat-label">Factures ce Mois</div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card primary">
+            <div class="stat-icon">
+                <i class="bi bi-currency-exchange"></i>
+            </div>
+            <div class="stat-value"><?php echo number_format($ventesMois, 2); ?> DH</div>
+            <div class="stat-label">Ventes ce Mois</div>
+        </div>
+    </div>
+</div>
+
+<!-- Contenu principal -->
+<div class="row g-4">
+    <!-- Derniers Bons -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-receipt me-2"></i>Derniers Bons
+                </h5>
+                        <a href="<?php echo url('bons/index.php'); ?>" class="btn btn-sm btn-outline-primary">
+                            Voir tout <i class="bi bi-arrow-right ms-1"></i>
+                        </a>
+            </div>
+            <div class="card-body">
+                <?php if (empty($derniersBons)): ?>
+                    <p class="text-muted text-center py-4">Aucun bon enregistré</p>
+                <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>N°</th>
+                                    <th>Client</th>
+                                    <th>Type</th>
+                                    <th>Date</th>
+                                    <th>Statut</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($derniersBons as $bon): ?>
+                                    <tr>
+                                        <td><strong>#<?php echo htmlspecialchars($bon['numero_bon']); ?></strong></td>
+                                        <td>
+                                            <?php 
+                                            if ($bon['type_client'] === 'entreprise') {
+                                                echo htmlspecialchars($bon['nom_entreprise'] ?? $bon['nom']);
+                                            } else {
+                                                echo htmlspecialchars($bon['nom'] . ' ' . ($bon['prenom'] ?? ''));
+                                            }
+                                            ?>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-<?php echo $bon['type_bon'] === 'entree' ? 'success' : 'primary'; ?>">
+                                                <?php echo $bon['type_bon'] === 'entree' ? 'Entrée' : 'Sortie'; ?>
+                                            </span>
+                                        </td>
+                                        <td><?php echo date('d/m/Y', strtotime($bon['date_bon'])); ?></td>
+                                        <td>
+                                            <span class="badge bg-<?php echo $bon['statut_paiement'] === 'paye' ? 'success' : 'warning'; ?>">
+                                                <?php echo $bon['statut_paiement'] === 'paye' ? 'Payé' : 'Non Payé'; ?>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Derniers Clients -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-people me-2"></i>Derniers Clients
+                </h5>
+                        <a href="<?php echo url('clients/index.php'); ?>" class="btn btn-sm btn-outline-primary">
+                            Voir tout <i class="bi bi-arrow-right ms-1"></i>
+                        </a>
+            </div>
+            <div class="card-body">
+                <?php if (empty($derniersClients)): ?>
+                    <p class="text-muted text-center py-4">Aucun client enregistré</p>
+                <?php else: ?>
+                    <div class="list-group list-group-flush">
+                        <?php foreach ($derniersClients as $client): ?>
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">
+                                        <?php 
+                                        if ($client['type_client'] === 'entreprise') {
+                                            echo htmlspecialchars($client['nom_entreprise'] ?? $client['nom']);
+                                        } else {
+                                            echo htmlspecialchars($client['nom'] . ' ' . ($client['prenom'] ?? ''));
+                                        }
+                                        ?>
+                                    </h6>
+                                    <small class="text-muted">
+                                        <i class="bi bi-<?php echo $client['type_client'] === 'entreprise' ? 'building' : 'person'; ?> me-1"></i>
+                                        <?php echo $client['type_client'] === 'entreprise' ? 'Entreprise' : 'Personne'; ?>
+                                        <?php if ($client['telephone']): ?>
+                                            | <i class="bi bi-telephone me-1"></i><?php echo htmlspecialchars($client['telephone']); ?>
+                                        <?php endif; ?>
+                                    </small>
+                                </div>
+                                <span class="badge bg-primary rounded-pill">
+                                    <?php echo date('d/m/Y', strtotime($client['date_creation'])); ?>
+                                </span>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Actions rapides -->
+<div class="row g-4 mt-2">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-lightning-charge me-2"></i>Actions Rapides
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <a href="clients/create.php" class="btn btn-outline-primary w-100">
+                            <i class="bi bi-person-plus me-2"></i>Nouveau Client
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="produits/create.php" class="btn btn-outline-success w-100">
+                            <i class="bi bi-plus-circle me-2"></i>Nouveau Produit
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="bons/create.php" class="btn btn-outline-info w-100">
+                            <i class="bi bi-receipt me-2"></i>Nouveau Bon
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="factures/create.php" class="btn btn-outline-warning w-100">
+                            <i class="bi bi-file-earmark-text me-2"></i>Nouvelle Facture
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php require_once 'includes/footer.php'; ?>
+

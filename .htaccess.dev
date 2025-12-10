@@ -1,0 +1,9 @@
+# Version simplifiée pour le développement
+# Renommez ce fichier en .htaccess si vous avez des problèmes
+
+# Protéger uniquement les fichiers SQL
+<FilesMatch "\.sql$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+

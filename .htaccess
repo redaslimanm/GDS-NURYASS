@@ -1,0 +1,30 @@
+# GDS - Stock Management System
+# Configuration Apache
+
+# Activer le moteur de réécriture
+RewriteEngine On
+
+# Protéger les fichiers sensibles
+<FilesMatch "\.(sql|log|ini|conf)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Empêcher l'accès aux fichiers de sauvegarde
+<FilesMatch "\.(bak|backup|old|tmp)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Protection contre les injections
+<IfModule mod_rewrite.c>
+    RewriteCond %{QUERY_STRING} (\<|%3C).*script.*(\>|%3E) [NC,OR]
+    RewriteCond %{QUERY_STRING} GLOBALS(=|\[|\%[0-9A-Z]{0,2}) [OR]
+    RewriteCond %{QUERY_STRING} _REQUEST(=|\[|\%[0-9A-Z]{0,2})
+    RewriteRule ^(.*)$ index.php [F,L]
+</IfModule>
+
+# Redirection vers index.php si le fichier n'existe pas (désactivé pour éviter les conflits)
+# RewriteCond %{REQUEST_FILENAME} !-f
+# RewriteCond %{REQUEST_FILENAME} !-d
+# RewriteRule ^(.*)$ index.php [QSA,L]

@@ -1,0 +1,5 @@
+# Protéger le dossier includes
+# Les fichiers peuvent être inclus mais pas accédés directement
+Order deny,allow
+Deny from all
+

@@ -1,0 +1,405 @@
+<?php
+/**
+ * Header et Navigation
+ * GDS - Stock Management System
+ */
+
+if (!isset($pageTitle)) {
+    $pageTitle = 'Dashboard';
+}
+
+$currentUser = getCurrentUser();
+
+// Note: La vérification de connexion est déjà faite via requireLogin() dans chaque page
+// On ne fait pas de redirection ici pour éviter les boucles infinies
+?>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?php echo htmlspecialchars($pageTitle); ?> - GDS NURYASS</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
+            --sidebar-width: 260px;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f7fa;
+        }
+        
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: var(--sidebar-width);
+            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            z-index: 1000;
+            overflow-y: auto;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        }
+        
+        .sidebar-header {
+            padding: 25px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .sidebar-header h4 {
+            margin: 0;
+            font-weight: 600;
+            font-size: 22px;
+        }
+        
+        .sidebar-header p {
+            margin: 5px 0 0 0;
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        
+        .sidebar-menu {
+            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+            min-height: calc(100vh - 120px);
+        }
+        
+        .sidebar-menu .settings-menu {
+            margin-top: auto;
+            margin-bottom: 20px;
+        }
+        
+        .sidebar-menu .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: 12px 20px;
+            margin: 2px 10px;
+            border-radius: 8px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+        }
+        
+        .sidebar-menu .nav-link:hover,
+        .sidebar-menu .nav-link.active {
+            background: rgba(255,255,255,0.15);
+            color: white;
+            transform: translateX(5px);
+        }
+        
+        .sidebar-menu .nav-link i {
+            width: 24px;
+            margin-right: 12px;
+            font-size: 18px;
+        }
+        
+        .settings-menu {
+            position: relative;
+            margin-top: auto;
+        }
+        
+        .settings-menu .nav-link {
+            margin-bottom: 0;
+        }
+        
+        .settings-dropdown {
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            right: 0;
+            margin-bottom: 10px;
+            background: rgba(0, 0, 0, 0.95);
+            border-radius: 8px;
+            padding: 0;
+            display: none;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+            z-index: 1001;
+            overflow: hidden;
+            min-width: 200px;
+        }
+        
+        .settings-menu.active .settings-dropdown {
+            display: block;
+        }
+        
+        .settings-menu.active .nav-link {
+            background: rgba(255,255,255,0.15);
+        }
+        
+        .settings-dropdown .dropdown-item {
+            color: rgba(255,255,255,0.9);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+            transition: all 0.3s;
+            border: none;
+            width: 100%;
+            background: transparent;
+        }
+        
+        .settings-dropdown .dropdown-item:hover {
+            background: rgba(255,255,255,0.15);
+            color: white;
+        }
+        
+        .settings-dropdown .dropdown-item i {
+            width: 24px;
+            margin-right: 12px;
+            font-size: 18px;
+        }
+        
+        .user-info-dropdown {
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.05);
+        }
+        
+        .user-info-dropdown .avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 10px;
+            font-size: 24px;
+        }
+        
+        .user-info-dropdown .username {
+            text-align: center;
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 3px;
+            color: white;
+        }
+        
+        .user-info-dropdown .role {
+            text-align: center;
+            font-size: 12px;
+            opacity: 0.8;
+            color: rgba(255,255,255,0.8);
+        }
+        
+        /* Main Content */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .top-bar {
+            background: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .page-title {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+            color: #2d3748;
+        }
+        
+        .breadcrumb {
+            margin: 0;
+            background: none;
+            padding: 0;
+        }
+        
+        /* Cards */
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: transform 0.3s, box-shadow 0.3s;
+            border-left: 4px solid;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+        
+        .stat-card.primary { border-left-color: #667eea; }
+        .stat-card.success { border-left-color: #48bb78; }
+        .stat-card.warning { border-left-color: #ed8936; }
+        .stat-card.danger { border-left-color: #f56565; }
+        .stat-card.info { border-left-color: #4299e1; }
+        
+        .stat-card .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            margin-bottom: 15px;
+        }
+        
+        .stat-card.primary .stat-icon { background: rgba(102, 126, 234, 0.1); color: #667eea; }
+        .stat-card.success .stat-icon { background: rgba(72, 187, 120, 0.1); color: #48bb78; }
+        .stat-card.warning .stat-icon { background: rgba(237, 137, 54, 0.1); color: #ed8936; }
+        .stat-card.danger .stat-icon { background: rgba(245, 101, 101, 0.1); color: #f56565; }
+        .stat-card.info .stat-icon { background: rgba(66, 153, 225, 0.1); color: #4299e1; }
+        
+        .stat-card .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #2d3748;
+            margin: 10px 0;
+        }
+        
+        .stat-card .stat-label {
+            color: #718096;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s;
+            }
+            
+            .sidebar.show {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h4><i class="bi bi-box-seam me-2"></i>GDS NURYASS</h4>
+            <p>Gestion de Stock</p>
+        </div>
+        
+        <nav class="sidebar-menu">
+            <a href="<?php echo url('dashboard.php'); ?>" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'dashboard.php' ? 'active' : ''; ?>">
+                <i class="bi bi-speedometer2"></i>
+                <span>Dashboard</span>
+            </a>
+            
+            <a href="<?php echo url('clients/index.php'); ?>" class="nav-link">
+                <i class="bi bi-people"></i>
+                <span>Clients</span>
+            </a>
+            
+            <a href="<?php echo url('produits/index.php'); ?>" class="nav-link">
+                <i class="bi bi-box"></i>
+                <span>Produits</span>
+            </a>
+            
+            <a href="<?php echo url('bons/index.php'); ?>" class="nav-link">
+                <i class="bi bi-receipt"></i>
+                <span>Bons</span>
+            </a>
+            
+            <a href="<?php echo url('credits/index.php'); ?>" class="nav-link">
+                <i class="bi bi-credit-card"></i>
+                <span>Crédits</span>
+            </a>
+            
+            <a href="<?php echo url('factures/index.php'); ?>" class="nav-link">
+                <i class="bi bi-file-earmark-text"></i>
+                <span>Factures</span>
+            </a>
+            
+            <a href="<?php echo url('historique/index.php'); ?>" class="nav-link">
+                <i class="bi bi-clock-history"></i>
+                <span>Historique</span>
+            </a>
+            
+            <?php if (isAdmin()): ?>
+            <div class="mt-3 px-3">
+                <small class="text-uppercase" style="opacity: 0.6; font-size: 11px;">Administration</small>
+            </div>
+            
+            <a href="<?php echo url('users/index.php'); ?>" class="nav-link">
+                <i class="bi bi-person-gear"></i>
+                <span>Utilisateurs</span>
+            </a>
+            
+            <a href="<?php echo url('types_produits/index.php'); ?>" class="nav-link">
+                <i class="bi bi-tags"></i>
+                <span>Types Produits</span>
+            </a>
+            
+            <a href="<?php echo url('couleurs/index.php'); ?>" class="nav-link">
+                <i class="bi bi-palette"></i>
+                <span>Couleurs</span>
+            </a>
+            <?php endif; ?>
+            
+            <!-- Settings Menu -->
+            <div class="settings-menu">
+                <a href="#" class="nav-link" id="settings-toggle">
+                    <i class="bi bi-gear"></i>
+                    <span>Paramètres</span>
+                </a>
+                <div class="settings-dropdown">
+                    <div class="user-info-dropdown">
+                        <div class="avatar">
+                            <i class="bi bi-person-circle"></i>
+                        </div>
+                        <div class="username"><?php echo htmlspecialchars($currentUser['username']); ?></div>
+                        <div class="role">
+                            <?php echo $currentUser['role'] === 'admin' ? 'Administrateur' : 'Caissier'; ?>
+                        </div>
+                    </div>
+                    <a href="<?php echo url('auth/logout.php'); ?>" class="dropdown-item">
+                        <i class="bi bi-box-arrow-right"></i>
+                        <span>Déconnexion</span>
+                    </a>
+                </div>
+            </div>
+        </nav>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Messages de succès/erreur -->
+        <?php if (isset($_SESSION['success_message'])): ?>
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i>
+                <?php echo htmlspecialchars($_SESSION['success_message']); ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            <?php unset($_SESSION['success_message']); ?>
+        <?php endif; ?>
+        
+        <?php if (isset($_SESSION['error_message'])): ?>
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <?php echo htmlspecialchars($_SESSION['error_message']); ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            <?php unset($_SESSION['error_message']); ?>
+        <?php endif; ?>
+
