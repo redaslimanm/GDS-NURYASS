@@ -32,8 +32,10 @@ try {
     $params = [];
     
     if (!empty($search)) {
-        $where[] = "(p.nom_produit LIKE :search OR p.description LIKE :search)";
-        $params['search'] = "%$search%";
+        $searchTerm = trim($search);
+        $where[] = "(LOWER(p.nom_produit) LIKE LOWER(:search_nom) OR LOWER(p.description) LIKE LOWER(:search_desc))";
+        $params['search_nom'] = "%$searchTerm%";
+        $params['search_desc'] = "%$searchTerm%";
     }
     
     if ($typeFilter > 0) {
@@ -190,8 +192,10 @@ require_once '../includes/header.php';
                     <input type="text" 
                            class="form-control" 
                            name="search" 
-                           placeholder="Rechercher un produit..." 
-                           value="<?php echo htmlspecialchars($search); ?>">
+                           id="searchInput"
+                           placeholder="Rechercher un produit (nom ou description)..." 
+                           value="<?php echo htmlspecialchars($search); ?>"
+                           autocomplete="off">
                 </div>
             </div>
             <div class="col-md-2">
@@ -226,6 +230,16 @@ require_once '../includes/header.php';
                     <i class="bi bi-funnel me-2"></i>Filtrer
                 </button>
             </div>
+            <?php if (!empty($search)): ?>
+            <div class="col-md-12 mt-2">
+                <a href="index.php?type=<?php echo $typeFilter; ?>&couleur=<?php echo $couleurFilter; ?>&stock=<?php echo urlencode($stockFilter); ?>" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-x-circle me-1"></i>Effacer la recherche
+                </a>
+                <small class="text-muted ms-2">
+                    <?php echo $totalProduits; ?> résultat(s) trouvé(s) pour "<?php echo htmlspecialchars($search); ?>"
+                </small>
+            </div>
+            <?php endif; ?>
         </form>
     </div>
 </div>
@@ -360,6 +374,34 @@ require_once '../includes/header.php';
         <?php endif; ?>
     </div>
 </div>
+
+<script>
+// Recherche automatique après 2 secondes d'inactivité
+let searchTimeout;
+document.getElementById('searchInput')?.addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    const searchValue = this.value.trim();
+    
+    // Si le champ est vide ou contient au moins 1 caractère, lancer la recherche après 1 seconde
+    if (searchValue.length === 0 || searchValue.length >= 1) {
+        searchTimeout = setTimeout(function() {
+            // Si le champ a changé, soumettre le formulaire
+            if (document.getElementById('searchInput').value.trim() === searchValue) {
+                document.querySelector('form').submit();
+            }
+        }, 1000);
+    }
+});
+
+// Permettre la recherche avec Entrée
+document.getElementById('searchInput')?.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        clearTimeout(searchTimeout);
+        document.querySelector('form').submit();
+    }
+});
+</script>
 
 <?php require_once '../includes/footer.php'; ?>
 

@@ -26,8 +26,15 @@ try {
     $params = [];
     
     if (!empty($search)) {
-        $where[] = "(nom LIKE :search OR prenom LIKE :search OR nom_entreprise LIKE :search OR cin LIKE :search OR patente LIKE :search OR telephone LIKE :search OR email LIKE :search)";
-        $params['search'] = "%$search%";
+        $searchTerm = trim($search);
+        $where[] = "(LOWER(nom) LIKE LOWER(:search_nom) OR LOWER(prenom) LIKE LOWER(:search_prenom) OR LOWER(nom_entreprise) LIKE LOWER(:search_entreprise) OR LOWER(cin) LIKE LOWER(:search_cin) OR LOWER(patente) LIKE LOWER(:search_patente) OR LOWER(telephone) LIKE LOWER(:search_tel) OR LOWER(email) LIKE LOWER(:search_email))";
+        $params['search_nom'] = "%$searchTerm%";
+        $params['search_prenom'] = "%$searchTerm%";
+        $params['search_entreprise'] = "%$searchTerm%";
+        $params['search_cin'] = "%$searchTerm%";
+        $params['search_patente'] = "%$searchTerm%";
+        $params['search_tel'] = "%$searchTerm%";
+        $params['search_email'] = "%$searchTerm%";
     }
     
     if (!empty($typeFilter)) {
@@ -100,8 +107,10 @@ require_once '../includes/header.php';
                     <input type="text" 
                            class="form-control" 
                            name="search" 
+                           id="searchInput"
                            placeholder="Rechercher par nom, CIN, téléphone, email..." 
-                           value="<?php echo htmlspecialchars($search); ?>">
+                           value="<?php echo htmlspecialchars($search); ?>"
+                           autocomplete="off">
                 </div>
             </div>
             <div class="col-md-3">
@@ -116,6 +125,16 @@ require_once '../includes/header.php';
                     <i class="bi bi-funnel me-2"></i>Filtrer
                 </button>
             </div>
+            <?php if (!empty($search)): ?>
+            <div class="col-md-12 mt-2">
+                <a href="index.php?type=<?php echo urlencode($typeFilter); ?>" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-x-circle me-1"></i>Effacer la recherche
+                </a>
+                <small class="text-muted ms-2">
+                    <?php echo $totalClients; ?> résultat(s) trouvé(s) pour "<?php echo htmlspecialchars($search); ?>"
+                </small>
+            </div>
+            <?php endif; ?>
         </form>
     </div>
 </div>
@@ -321,6 +340,34 @@ require_once '../includes/header.php';
         <?php endif; ?>
     </div>
 </div>
+
+<script>
+// Recherche automatique après 1 seconde d'inactivité
+let searchTimeout;
+document.getElementById('searchInput')?.addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    const searchValue = this.value.trim();
+    
+    // Si le champ est vide ou contient au moins 1 caractère, lancer la recherche après 1 seconde
+    if (searchValue.length === 0 || searchValue.length >= 1) {
+        searchTimeout = setTimeout(function() {
+            // Si le champ a changé, soumettre le formulaire
+            if (document.getElementById('searchInput').value.trim() === searchValue) {
+                document.querySelector('form').submit();
+            }
+        }, 1000);
+    }
+});
+
+// Permettre la recherche avec Entrée
+document.getElementById('searchInput')?.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        clearTimeout(searchTimeout);
+        document.querySelector('form').submit();
+    }
+});
+</script>
 
 <?php require_once '../includes/footer.php'; ?>
 

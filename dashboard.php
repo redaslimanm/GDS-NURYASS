@@ -40,8 +40,20 @@ try {
     $stmt = $pdo->query("SELECT COUNT(*) FROM factures WHERE MONTH(date_facture) = MONTH(CURRENT_DATE()) AND YEAR(date_facture) = YEAR(CURRENT_DATE())");
     $facturesMois = $stmt->fetchColumn();
     
-    // Total des ventes ce mois
-    $stmt = $pdo->query("SELECT COALESCE(SUM(total), 0) FROM factures WHERE MONTH(date_facture) = MONTH(CURRENT_DATE()) AND YEAR(date_facture) = YEAR(CURRENT_DATE())");
+    // Total des ventes ce mois (factures + bons de sortie)
+    $stmt = $pdo->query("
+        SELECT COALESCE(SUM(total), 0) as total_ventes
+        FROM (
+            SELECT total FROM factures 
+            WHERE MONTH(date_facture) = MONTH(CURRENT_DATE()) 
+            AND YEAR(date_facture) = YEAR(CURRENT_DATE())
+            UNION ALL
+            SELECT total FROM bons 
+            WHERE MONTH(date_bon) = MONTH(CURRENT_DATE()) 
+            AND YEAR(date_bon) = YEAR(CURRENT_DATE())
+            AND type_bon = 'sortie'
+        ) as ventes_combinees
+    ");
     $ventesMois = $stmt->fetchColumn();
     
     // Bons du jour
@@ -68,11 +80,66 @@ try {
     ");
     $derniersClients = $stmt->fetchAll();
     
+    // Dernières opérations (bons + factures + transactions crédit)
+    $stmt = $pdo->prepare("
+        SELECT 
+            'bon' as type_operation,
+            b.id,
+            b.numero_bon as numero,
+            b.date_bon as date_op,
+            b.total as montant,
+            b.type_bon,
+            b.statut_paiement,
+            c.nom,
+            c.prenom,
+            c.nom_entreprise,
+            c.type_client,
+            NULL as type_transaction
+        FROM bons b
+        LEFT JOIN clients c ON b.client_id = c.id
+        UNION ALL
+        SELECT 
+            'facture' as type_operation,
+            f.id,
+            f.numero_facture as numero,
+            f.date_facture as date_op,
+            f.total as montant,
+            NULL as type_bon,
+            NULL as statut_paiement,
+            c.nom,
+            c.prenom,
+            c.nom_entreprise,
+            c.type_client,
+            NULL as type_transaction
+        FROM factures f
+        LEFT JOIN clients c ON f.client_id = c.id
+        UNION ALL
+        SELECT 
+            'credit' as type_operation,
+            ct.id,
+            CONCAT('TRANS-', ct.id) as numero,
+            ct.date_transaction as date_op,
+            ct.montant,
+            NULL as type_bon,
+            NULL as statut_paiement,
+            c.nom,
+            c.prenom,
+            c.nom_entreprise,
+            c.type_client,
+            ct.type_transaction
+        FROM credits_transactions ct
+        LEFT JOIN clients c ON ct.client_id = c.id
+        ORDER BY date_op DESC
+        LIMIT 10
+    ");
+    $stmt->execute();
+    $dernieresOperations = $stmt->fetchAll();
+    
 } catch (PDOException $e) {
     error_log("Erreur dashboard: " . $e->getMessage());
     $totalClients = $totalProduits = $produitsStockFaible = $bonsNonPayes = 0;
     $totalCredits = $facturesMois = $ventesMois = $bonsAujourdhui = 0;
-    $derniersBons = $derniersClients = [];
+    $derniersBons = $derniersClients = $dernieresOperations = [];
 }
 
 require_once 'includes/header.php';
@@ -232,8 +299,107 @@ require_once 'includes/header.php';
         </div>
     </div>
     
-    <!-- Derniers Clients -->
+    <!-- Dernières Opérations -->
     <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-activity me-2"></i>Dernières Opérations
+                </h5>
+                <a href="<?php echo url('operations/index.php'); ?>" class="btn btn-sm btn-outline-primary">
+                    Voir tout <i class="bi bi-arrow-right ms-1"></i>
+                </a>
+            </div>
+            <div class="card-body">
+                <?php if (empty($dernieresOperations)): ?>
+                    <p class="text-muted text-center py-4">Aucune opération enregistrée</p>
+                <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>N°</th>
+                                    <th>Client</th>
+                                    <th>Date</th>
+                                    <th>Montant</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($dernieresOperations as $op): ?>
+                                    <?php
+                                    // Déterminer le signe et la couleur selon le type d'opération
+                                    $montant = floatval($op['montant']);
+                                    $isPositive = false;
+                                    $badgeClass = '';
+                                    $typeLabel = '';
+                                    
+                                    if ($op['type_operation'] === 'bon') {
+                                        if ($op['type_bon'] === 'entree') {
+                                            $isPositive = true;
+                                            $badgeClass = 'success';
+                                            $typeLabel = 'Bon Entrée';
+                                        } else {
+                                            $isPositive = false;
+                                            $badgeClass = 'danger';
+                                            $typeLabel = 'Bon Sortie';
+                                        }
+                                    } elseif ($op['type_operation'] === 'facture') {
+                                        $isPositive = true;
+                                        $badgeClass = 'info';
+                                        $typeLabel = 'Facture';
+                                    } elseif ($op['type_operation'] === 'credit') {
+                                        if ($op['type_transaction'] === 'ajout') {
+                                            $isPositive = false;
+                                            $badgeClass = 'warning';
+                                            $typeLabel = 'Crédit Ajouté';
+                                        } elseif ($op['type_transaction'] === 'paiement') {
+                                            $isPositive = true;
+                                            $badgeClass = 'success';
+                                            $typeLabel = 'Paiement Crédit';
+                                        } else {
+                                            $isPositive = true;
+                                            $badgeClass = 'secondary';
+                                            $typeLabel = 'Annulation';
+                                        }
+                                    }
+                                    
+                                    $clientName = '';
+                                    if ($op['type_client'] === 'entreprise') {
+                                        $clientName = htmlspecialchars($op['nom_entreprise'] ?? $op['nom'] ?? '-');
+                                    } else {
+                                        $clientName = htmlspecialchars(trim(($op['nom'] ?? '') . ' ' . ($op['prenom'] ?? '')) ?: '-');
+                                    }
+                                    ?>
+                                    <tr>
+                                        <td>
+                                            <span class="badge bg-<?php echo $badgeClass; ?>">
+                                                <?php echo $typeLabel; ?>
+                                            </span>
+                                        </td>
+                                        <td><strong>#<?php echo htmlspecialchars($op['numero']); ?></strong></td>
+                                        <td><small><?php echo $clientName; ?></small></td>
+                                        <td><small><?php echo date('d/m/Y H:i', strtotime($op['date_op'])); ?></small></td>
+                                        <td>
+                                            <strong class="text-<?php echo $isPositive ? 'success' : 'danger'; ?>">
+                                                <?php echo $isPositive ? '+' : '-'; ?>
+                                                <?php echo number_format($montant, 2); ?> DH
+                                            </strong>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mt-2">
+    <!-- Derniers Clients -->
+    <div class="col-md-12">
         <div class="card">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
@@ -247,30 +413,32 @@ require_once 'includes/header.php';
                 <?php if (empty($derniersClients)): ?>
                     <p class="text-muted text-center py-4">Aucun client enregistré</p>
                 <?php else: ?>
-                    <div class="list-group list-group-flush">
+                    <div class="row g-3">
                         <?php foreach ($derniersClients as $client): ?>
-                            <div class="list-group-item d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="mb-1">
-                                        <?php 
-                                        if ($client['type_client'] === 'entreprise') {
-                                            echo htmlspecialchars($client['nom_entreprise'] ?? $client['nom']);
-                                        } else {
-                                            echo htmlspecialchars($client['nom'] . ' ' . ($client['prenom'] ?? ''));
-                                        }
-                                        ?>
-                                    </h6>
-                                    <small class="text-muted">
-                                        <i class="bi bi-<?php echo $client['type_client'] === 'entreprise' ? 'building' : 'person'; ?> me-1"></i>
-                                        <?php echo $client['type_client'] === 'entreprise' ? 'Entreprise' : 'Personne'; ?>
-                                        <?php if ($client['telephone']): ?>
-                                            | <i class="bi bi-telephone me-1"></i><?php echo htmlspecialchars($client['telephone']); ?>
-                                        <?php endif; ?>
-                                    </small>
+                            <div class="col-md-6">
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">
+                                            <?php 
+                                            if ($client['type_client'] === 'entreprise') {
+                                                echo htmlspecialchars($client['nom_entreprise'] ?? $client['nom']);
+                                            } else {
+                                                echo htmlspecialchars($client['nom'] . ' ' . ($client['prenom'] ?? ''));
+                                            }
+                                            ?>
+                                        </h6>
+                                        <small class="text-muted">
+                                            <i class="bi bi-<?php echo $client['type_client'] === 'entreprise' ? 'building' : 'person'; ?> me-1"></i>
+                                            <?php echo $client['type_client'] === 'entreprise' ? 'Entreprise' : 'Personne'; ?>
+                                            <?php if ($client['telephone']): ?>
+                                                | <i class="bi bi-telephone me-1"></i><?php echo htmlspecialchars($client['telephone']); ?>
+                                            <?php endif; ?>
+                                        </small>
+                                    </div>
+                                    <span class="badge bg-primary rounded-pill">
+                                        <?php echo date('d/m/Y', strtotime($client['date_creation'])); ?>
+                                    </span>
                                 </div>
-                                <span class="badge bg-primary rounded-pill">
-                                    <?php echo date('d/m/Y', strtotime($client['date_creation'])); ?>
-                                </span>
                             </div>
                         <?php endforeach; ?>
                     </div>

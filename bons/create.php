@@ -26,15 +26,107 @@ try {
 
 // Traitement du formulaire
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $clientType = $_POST['client_type'] ?? 'existant'; // 'existant' ou 'nouveau'
     $clientId = intval($_POST['client_id'] ?? 0);
     $typeBon = $_POST['type_bon'] ?? '';
     $statutPaiement = $_POST['statut_paiement'] ?? 'non_paye';
     $details = trim($_POST['details'] ?? '');
     $produitsData = $_POST['produits'] ?? [];
     
+    // Si nouveau client, créer le client d'abord
+    if ($clientType === 'nouveau') {
+        $typeClient = $_POST['type_client'] ?? '';
+        $nom = trim($_POST['nom'] ?? '');
+        $prenom = trim($_POST['prenom'] ?? '');
+        $cin = trim($_POST['cin'] ?? '');
+        $adresse = trim($_POST['adresse'] ?? '');
+        $nomEntreprise = trim($_POST['nom_entreprise'] ?? '');
+        $patente = trim($_POST['patente'] ?? '');
+        $telephone = trim($_POST['telephone'] ?? '');
+        $email = trim($_POST['email'] ?? '');
+        $creditMax = floatval($_POST['credit_max'] ?? 5000);
+        
+        // Validation nouveau client
+        if (empty($typeClient) || !in_array($typeClient, ['personne', 'entreprise'])) {
+            $errors[] = 'Type de client invalide.';
+        }
+        
+        if (empty($adresse)) {
+            $errors[] = 'L\'adresse est requise.';
+        }
+        
+        if ($typeClient === 'personne') {
+            if (empty($nom)) {
+                $errors[] = 'Le nom est requis pour une personne.';
+            }
+        }
+        
+        if ($typeClient === 'entreprise') {
+            if (empty($nomEntreprise)) {
+                $errors[] = 'Le nom de l\'entreprise est requis.';
+            }
+            if (empty($nom)) {
+                $nom = $nomEntreprise;
+            }
+        }
+        
+        // Créer le nouveau client si pas d'erreurs
+        if (empty($errors)) {
+            try {
+                $pdo->beginTransaction();
+                
+                $stmt = $pdo->prepare("
+                    INSERT INTO clients (
+                        type_client, nom, prenom, cin, adresse, 
+                        nom_entreprise, patente, telephone, email, credit_max
+                    ) VALUES (
+                        :type_client, :nom, :prenom, :cin, :adresse,
+                        :nom_entreprise, :patente, :telephone, :email, :credit_max
+                    )
+                ");
+                
+                $stmt->execute([
+                    'type_client' => $typeClient,
+                    'nom' => $nom,
+                    'prenom' => $typeClient === 'personne' ? ($prenom ?: null) : null,
+                    'cin' => $typeClient === 'personne' ? ($cin ?: null) : null,
+                    'adresse' => $adresse,
+                    'nom_entreprise' => $typeClient === 'entreprise' ? ($nomEntreprise ?: null) : null,
+                    'patente' => $typeClient === 'entreprise' ? ($patente ?: null) : null,
+                    'telephone' => $telephone ?: null,
+                    'email' => $email ?: null,
+                    'credit_max' => $creditMax
+                ]);
+                
+                $clientId = $pdo->lastInsertId();
+                
+                // Créer l'enregistrement de crédit pour ce client
+                $stmt = $pdo->prepare("
+                    INSERT INTO credits (client_id, montant_actuel, max_montant, statut)
+                    VALUES (:client_id, 0, :max_montant, 'actif')
+                ");
+                $stmt->execute([
+                    'client_id' => $clientId,
+                    'max_montant' => $creditMax
+                ]);
+                
+                $pdo->commit();
+                
+            } catch (PDOException $e) {
+                $pdo->rollBack();
+                error_log("Erreur création client: " . $e->getMessage());
+                $errors[] = 'Erreur lors de la création du client.';
+            }
+        }
+    }
+    
     // Validation
-    if ($clientId <= 0) {
-        $errors[] = 'Le client est requis.';
+    if ($clientType === 'existant' && $clientId <= 0) {
+        $errors[] = 'Veuillez sélectionner un client existant.';
+    }
+    
+    if ($clientType === 'nouveau' && $clientId <= 0) {
+        $errors[] = 'Erreur lors de la création du client. Veuillez réessayer.';
     }
     
     if (empty($typeBon) || !in_array($typeBon, ['entree', 'sortie'])) {
@@ -43,6 +135,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     if (empty($produitsData)) {
         $errors[] = 'Au moins un produit est requis.';
+    }
+    
+    // Valider les produits
+    $hasValidProduct = false;
+    foreach ($produitsData as $prod) {
+        $produitId = intval($prod['produit_id'] ?? 0);
+        $quantite = intval($prod['quantite'] ?? 0);
+        $prix = floatval($prod['prix'] ?? 0);
+        if ($produitId > 0 && $quantite > 0 && $prix > 0) {
+            $hasValidProduct = true;
+            break;
+        }
+    }
+    
+    if (!$hasValidProduct) {
+        $errors[] = 'Au moins un produit avec quantité et prix valides est requis.';
     }
     
     if (empty($errors)) {
@@ -215,29 +323,148 @@ require_once '../includes/header.php';
                 <?php endif; ?>
                 
                 <form method="POST" id="bonForm">
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label for="client_id" class="form-label">Client <span class="text-danger">*</span></label>
-                            <select class="form-select" id="client_id" name="client_id" required>
-                                <option value="">Sélectionner un client</option>
-                                <?php foreach ($clients as $client): ?>
-                                    <option value="<?php echo $client['id']; ?>" <?php echo $clientId == $client['id'] ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($client['type_client'] === 'entreprise' ? ($client['nom_entreprise'] ?? $client['nom']) : ($client['nom'] . ' ' . ($client['prenom'] ?? ''))); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
+                    <!-- Choix du type de client -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Sélectionner le Client <span class="text-danger">*</span></label>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check form-check-card">
+                                    <input class="form-check-input" type="radio" name="client_type" id="client_existant" value="existant" checked onchange="toggleClientSelection()">
+                                    <label class="form-check-label w-100 p-3 border rounded" for="client_existant">
+                                        <i class="bi bi-person-check fs-3 d-block mb-2"></i>
+                                        <strong>Client Existant</strong>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check form-check-card">
+                                    <input class="form-check-input" type="radio" name="client_type" id="client_nouveau" value="nouveau" onchange="toggleClientSelection()">
+                                    <label class="form-check-label w-100 p-3 border rounded" for="client_nouveau">
+                                        <i class="bi bi-person-plus fs-3 d-block mb-2"></i>
+                                        <strong>Nouveau Client</strong>
+                                    </label>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-3">
+                    </div>
+                    
+                    <hr>
+                    
+                    <!-- Client existant -->
+                    <div id="client-existant-section">
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label for="client_id" class="form-label">Client <span class="text-danger">*</span></label>
+                                <select class="form-select" id="client_id" name="client_id">
+                                    <option value="">Sélectionner un client</option>
+                                    <?php foreach ($clients as $client): ?>
+                                        <option value="<?php echo $client['id']; ?>" <?php echo $clientId == $client['id'] ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($client['type_client'] === 'entreprise' ? ($client['nom_entreprise'] ?? $client['nom']) : ($client['nom'] . ' ' . ($client['prenom'] ?? ''))); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Nouveau client -->
+                    <div id="client-nouveau-section" style="display: none;">
+                        <h5 class="mb-3">Informations du Nouveau Client</h5>
+                        
+                        <!-- Type de client -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Type de Client <span class="text-danger">*</span></label>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check form-check-card">
+                                        <input class="form-check-input" type="radio" name="type_client" id="type_personne" value="personne" checked onchange="toggleNewClientType()">
+                                        <label class="form-check-label w-100 p-3 border rounded" for="type_personne">
+                                            <i class="bi bi-person fs-3 d-block mb-2"></i>
+                                            <strong>Personne</strong>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check form-check-card">
+                                        <input class="form-check-input" type="radio" name="type_client" id="type_entreprise" value="entreprise" onchange="toggleNewClientType()">
+                                        <label class="form-check-label w-100 p-3 border rounded" for="type_entreprise">
+                                            <i class="bi bi-building fs-3 d-block mb-2"></i>
+                                            <strong>Entreprise</strong>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Champs pour Personne -->
+                        <div id="personne_fields">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="nom" class="form-label">Nom <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="nom" name="nom">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="prenom" class="form-label">Prénom</label>
+                                    <input type="text" class="form-control" id="prenom" name="prenom">
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="cin" class="form-label">CIN</label>
+                                <input type="text" class="form-control" id="cin" name="cin" maxlength="20">
+                            </div>
+                        </div>
+                        
+                        <!-- Champs pour Entreprise -->
+                        <div id="entreprise_fields" style="display: none;">
+                            <div class="mb-3">
+                                <label for="nom_entreprise" class="form-label">Nom de l'Entreprise <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="nom_entreprise" name="nom_entreprise">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="patente" class="form-label">Numéro de Patente</label>
+                                <input type="text" class="form-control" id="patente" name="patente" maxlength="50">
+                            </div>
+                        </div>
+                        
+                        <!-- Champs communs -->
+                        <div class="mb-3">
+                            <label for="adresse" class="form-label">Adresse <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="adresse" name="adresse" rows="2"></textarea>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="telephone" class="form-label">Téléphone</label>
+                                <input type="tel" class="form-control" id="telephone" name="telephone">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="email" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="email" name="email">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="credit_max" class="form-label">Crédit Maximum Autorisé (DH)</label>
+                            <input type="number" class="form-control" id="credit_max" name="credit_max" value="5000" min="0" step="0.01">
+                        </div>
+                        
+                        <hr>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-4">
                             <label for="type_bon" class="form-label">Type <span class="text-danger">*</span></label>
-                            <select class="form-select" id="type_bon" name="type_bon" required>
+                            <select class="form-select form-select-lg" id="type_bon" name="type_bon" required>
                                 <option value="">Sélectionner</option>
                                 <option value="entree">Entrée (Réception)</option>
                                 <option value="sortie">Sortie (Vente/Usage)</option>
                             </select>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <label for="statut_paiement" class="form-label">Statut Paiement</label>
-                            <select class="form-select" id="statut_paiement" name="statut_paiement">
+                            <select class="form-select form-select-lg" id="statut_paiement" name="statut_paiement">
                                 <option value="paye">Payé</option>
                                 <option value="non_paye" selected>Non Payé</option>
                             </select>
@@ -302,7 +529,7 @@ require_once '../includes/header.php';
                         </div>
                         <div class="col-md-6 text-end">
                             <a href="index.php" class="btn btn-outline-secondary">Annuler</a>
-                            <button type="submit" class="btn btn-primary">
+                            <button type="submit" class="btn btn-primary" id="submit-bon-btn">
                                 <i class="bi bi-check-circle me-2"></i>Créer le Bon
                             </button>
                         </div>
@@ -394,7 +621,268 @@ attachProduitEvents(document.querySelector('.produit-row'));
 if (document.querySelectorAll('.produit-row').length > 1) {
     document.querySelectorAll('.remove-produit').forEach(btn => btn.style.display = 'block');
 }
+
+// Toggle entre client existant et nouveau client
+function toggleClientSelection() {
+    const clientExistant = document.getElementById('client_existant');
+    const clientExistantSection = document.getElementById('client-existant-section');
+    const clientNouveauSection = document.getElementById('client-nouveau-section');
+    const clientSelect = document.getElementById('client_id');
+    
+    if (!clientExistant || !clientExistantSection || !clientNouveauSection || !clientSelect) {
+        console.error('Erreur: Éléments non trouvés dans toggleClientSelection');
+        return;
+    }
+    
+    const isExistant = clientExistant.checked;
+    
+    if (isExistant) {
+        clientExistantSection.style.display = 'block';
+        clientNouveauSection.style.display = 'none';
+        clientSelect.setAttribute('required', 'required');
+        console.log('✓ Mode: Client Existant - required ajouté');
+        // Désactiver les champs requis du nouveau client
+        document.querySelectorAll('#client-nouveau-section input[required], #client-nouveau-section textarea[required]').forEach(el => {
+            el.removeAttribute('required');
+        });
+    } else {
+        clientExistantSection.style.display = 'none';
+        clientNouveauSection.style.display = 'block';
+        clientSelect.removeAttribute('required');
+        console.log('✓ Mode: Nouveau Client - required retiré');
+        // Activer les champs requis du nouveau client
+        const typePersonne = document.getElementById('type_personne');
+        if (typePersonne && typePersonne.checked) {
+            const nomField = document.getElementById('nom');
+            if (nomField) nomField.setAttribute('required', 'required');
+        } else {
+            const nomEntrepriseField = document.getElementById('nom_entreprise');
+            if (nomEntrepriseField) nomEntrepriseField.setAttribute('required', 'required');
+        }
+        const adresseField = document.getElementById('adresse');
+        if (adresseField) adresseField.setAttribute('required', 'required');
+    }
+}
+
+// Toggle entre personne et entreprise pour nouveau client
+function toggleNewClientType() {
+    const typePersonne = document.getElementById('type_personne').checked;
+    const personneFields = document.getElementById('personne_fields');
+    const entrepriseFields = document.getElementById('entreprise_fields');
+    const nom = document.getElementById('nom');
+    const nomEntreprise = document.getElementById('nom_entreprise');
+    
+    if (typePersonne) {
+        personneFields.style.display = 'block';
+        entrepriseFields.style.display = 'none';
+        if (nomEntreprise) nomEntreprise.removeAttribute('required');
+        if (nom) nom.setAttribute('required', 'required');
+    } else {
+        personneFields.style.display = 'none';
+        entrepriseFields.style.display = 'block';
+        if (nomEntreprise) nomEntreprise.setAttribute('required', 'required');
+        if (nom) nom.removeAttribute('required');
+    }
+}
+
+// Validation du formulaire avant soumission
+document.addEventListener('DOMContentLoaded', function() {
+    const bonForm = document.getElementById('bonForm');
+    if (!bonForm) {
+        console.error('ERREUR: Formulaire bonForm non trouvé!');
+        return;
+    }
+    
+    console.log('✓ Formulaire trouvé, ajout de l\'événement submit...');
+    
+    bonForm.addEventListener('submit', function(e) {
+        console.log('=== SOUMISSION DU FORMULAIRE ===');
+        
+        try {
+            const clientTypeRadio = document.querySelector('input[name="client_type"]:checked');
+            if (!clientTypeRadio) {
+                console.error('Aucun type de client sélectionné');
+                e.preventDefault();
+                alert('Veuillez sélectionner le type de client (Existant ou Nouveau).');
+                return false;
+            }
+            
+            const clientType = clientTypeRadio.value;
+            console.log('Type de client:', clientType);
+            
+            // Vérifier le type de bon
+            const typeBon = document.getElementById('type_bon');
+            if (!typeBon || !typeBon.value) {
+                console.error('Type de bon non sélectionné');
+                e.preventDefault();
+                alert('Veuillez sélectionner le type de bon.');
+                if (typeBon) typeBon.focus();
+                return false;
+            }
+            console.log('Type de bon:', typeBon.value);
+            
+            // Vérifier les produits
+            let hasValidProduct = false;
+            const produits = document.querySelectorAll('.produit-select');
+            console.log('Nombre de produits:', produits.length);
+            
+            produits.forEach((select, index) => {
+                if (select.value && select.value !== '') {
+                    const row = select.closest('.produit-row');
+                    if (row) {
+                        const quantiteInput = row.querySelector('.quantite-input');
+                        const prixInput = row.querySelector('.prix-input');
+                        if (quantiteInput && prixInput) {
+                            const quantite = parseFloat(quantiteInput.value) || 0;
+                            const prix = parseFloat(prixInput.value) || 0;
+                            console.log(`Produit ${index + 1}: quantite=${quantite}, prix=${prix}`);
+                            if (quantite > 0 && prix > 0) {
+                                hasValidProduct = true;
+                            }
+                        }
+                    }
+                }
+            });
+            
+            if (!hasValidProduct) {
+                console.error('Aucun produit valide trouvé');
+                e.preventDefault();
+                alert('Veuillez ajouter au moins un produit avec quantité et prix valides.');
+                return false;
+            }
+            console.log('✓ Produits valides:', hasValidProduct);
+            
+            // Vérifier le client selon le type
+            if (clientType === 'existant') {
+                const clientSelect = document.getElementById('client_id');
+                if (!clientSelect) {
+                    console.error('ERREUR: Champ client_id non trouvé dans le DOM');
+                    // Ne pas bloquer, laisser le serveur gérer
+                    console.log('Champ non trouvé, soumission autorisée pour validation serveur');
+                    return true;
+                }
+                
+                const clientId = clientSelect.value ? clientSelect.value.trim() : '';
+                console.log('Client ID sélectionné:', clientId);
+                
+                if (!clientId || clientId === '' || clientId === '0') {
+                    console.error('Aucun client sélectionné');
+                    e.preventDefault();
+                    alert('Veuillez sélectionner un client existant.');
+                    clientSelect.focus();
+                    return false;
+                }
+                console.log('✓ Client validé:', clientId);
+            } else {
+                // Vérifier les champs du nouveau client
+                const typeClientRadio = document.querySelector('input[name="type_client"]:checked');
+                if (!typeClientRadio) {
+                    e.preventDefault();
+                    alert('Veuillez sélectionner le type de client (Personne ou Entreprise).');
+                    return false;
+                }
+                
+                const typeClient = typeClientRadio.value;
+                const adresse = document.getElementById('adresse');
+                
+                if (!adresse || !adresse.value.trim()) {
+                    e.preventDefault();
+                    alert('L\'adresse est requise.');
+                    if (adresse) adresse.focus();
+                    return false;
+                }
+                
+                if (typeClient === 'personne') {
+                    const nom = document.getElementById('nom');
+                    if (!nom || !nom.value.trim()) {
+                        e.preventDefault();
+                        alert('Le nom est requis pour une personne.');
+                        if (nom) nom.focus();
+                        return false;
+                    }
+                } else {
+                    const nomEntreprise = document.getElementById('nom_entreprise');
+                    if (!nomEntreprise || !nomEntreprise.value.trim()) {
+                        e.preventDefault();
+                        alert('Le nom de l\'entreprise est requis.');
+                        if (nomEntreprise) nomEntreprise.focus();
+                        return false;
+                    }
+                }
+            }
+            
+            console.log('✓ Validation réussie, soumission du formulaire...');
+            return true;
+        } catch (error) {
+            console.error('ERREUR dans la validation:', error);
+            console.error('Stack:', error.stack);
+            // En cas d'erreur, permettre la soumission pour que le serveur gère la validation
+            alert('Une erreur est survenue lors de la validation. Le formulaire sera soumis pour validation côté serveur.');
+            return true;
+        }
+    });
+    
+    console.log('✓ Événement submit ajouté au formulaire');
+});
+
+// Initialiser au chargement
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('=== INITIALISATION COMPLÈTE ===');
+    
+    // S'assurer que le champ client_id a l'attribut required si client existant est sélectionné
+    const clientExistantRadio = document.getElementById('client_existant');
+    if (clientExistantRadio && clientExistantRadio.checked) {
+        const clientSelect = document.getElementById('client_id');
+        if (clientSelect) {
+            clientSelect.setAttribute('required', 'required');
+            console.log('✓ Attribut required ajouté au champ client_id');
+        }
+    }
+    
+    toggleClientSelection();
+    toggleNewClientType();
+    
+    // Test direct du bouton
+    const submitBtn = document.getElementById('submit-bon-btn');
+    if (submitBtn) {
+        console.log('✓ Bouton submit trouvé');
+        submitBtn.addEventListener('click', function(e) {
+            console.log('=== CLIC DIRECT SUR LE BOUTON ===');
+            console.log('Type d\'événement:', e.type);
+            console.log('Bouton:', this);
+        });
+    } else {
+        console.error('ERREUR: Bouton submit-bon-btn non trouvé!');
+    }
+    
+    // Debug: vérifier l'état initial
+    console.log('Client existant sélectionné:', clientExistantRadio ? clientExistantRadio.checked : 'N/A');
+    console.log('Champ client_id required:', document.getElementById('client_id') ? document.getElementById('client_id').hasAttribute('required') : 'N/A');
+    console.log('=== FIN INITIALISATION ===');
+});
 </script>
+
+<style>
+.form-check-card {
+    position: relative;
+}
+
+.form-check-card .form-check-input {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
+
+.form-check-card .form-check-label {
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.form-check-card .form-check-input:checked + .form-check-label {
+    background: rgba(102, 126, 234, 0.1);
+    border-color: #667eea !important;
+}
+</style>
 
 <?php require_once '../includes/footer.php'; ?>
 

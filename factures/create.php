@@ -107,3 +107,7 @@ document.querySelectorAll('.produit-select, .quantite-input, .prix-input').forEa
 </script>
 <?php require_once '../includes/footer.php'; ?>
 
+
+
+
+

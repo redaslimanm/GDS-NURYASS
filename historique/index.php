@@ -54,3 +54,7 @@ require_once '../includes/header.php';
 <div class="card"><div class="card-body p-0"><?php if (empty($historique)): ?><div class="text-center py-5"><p class="text-muted">Aucun historique</p></div><?php else: ?><div class="table-responsive"><table class="table table-hover mb-0"><thead class="table-light"><tr><th>Date</th><th>Utilisateur</th><th>Action</th><th>Type</th><th>Détails</th></tr></thead><tbody><?php foreach ($historique as $h): ?><tr><td><?php echo date('d/m/Y H:i', strtotime($h['date_action'])); ?></td><td><?php echo htmlspecialchars($h['username'] ?? '-'); ?></td><td><?php echo htmlspecialchars($h['action']); ?></td><td><span class="badge bg-<?php echo $h['type_action'] === 'creation' ? 'success' : ($h['type_action'] === 'modification' ? 'warning' : ($h['type_action'] === 'suppression' ? 'danger' : 'info')); ?>"><?php echo htmlspecialchars($h['type_action']); ?></span></td><td><small><?php echo htmlspecialchars($h['details'] ?? '-'); ?></small></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?></div></div>
 <?php require_once '../includes/footer.php'; ?>
 
+
+
+
+

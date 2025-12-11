@@ -71,3 +71,7 @@ foreach ($files as $file) {
 echo "<br><strong>✅ Correction terminée! $fixed fichiers corrigés.</strong><br>";
 echo "<br><a href='dashboard.php'>Retour au Dashboard</a>";
 
+
+
+
+

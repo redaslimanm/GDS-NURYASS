@@ -119,3 +119,7 @@ Si le problème persiste, vérifiez :
 2. Le pare-feu Windows n'bloque pas Apache
 3. Les permissions du dossier sont correctes
 
+
+
+
+

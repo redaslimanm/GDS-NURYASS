@@ -26,3 +26,7 @@ require_once '../includes/header.php';
 <div class="mt-3"><a href="paiement.php?id=<?php echo $creditId; ?>" class="btn btn-success"><i class="bi bi-cash me-2"></i>Enregistrer un Paiement</a></div>
 <?php require_once '../includes/footer.php'; ?>
 
+
+
+
+

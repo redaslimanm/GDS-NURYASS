@@ -52,3 +52,7 @@ url('bons/index.php') → '../bons/index.php'
 2. Cliquez sur les liens de navigation
 3. Tous les liens devraient fonctionner correctement maintenant
 
+
+
+
+

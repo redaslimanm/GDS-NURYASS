@@ -32,17 +32,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Type de client invalide.';
     }
     
-    if (empty($nom)) {
-        $errors[] = 'Le nom est requis.';
-    }
-    
     if (empty($adresse)) {
         $errors[] = 'L\'adresse est requise.';
     }
     
+    if ($typeClient === 'personne') {
+        if (empty($nom)) {
+            $errors[] = 'Le nom est requis pour une personne.';
+        }
+    }
+    
     if ($typeClient === 'entreprise') {
         if (empty($nomEntreprise)) {
-            $errors[] = 'Le nom de l\'entreprise est requis pour une entreprise.';
+            $errors[] = 'Le nom de l\'entreprise est requis.';
+        }
+        // Pour une entreprise, utiliser nom_entreprise comme nom dans la base
+        if (empty($nom)) {
+            $nom = $nomEntreprise;
         }
     }
     
@@ -205,7 +211,7 @@ require_once '../includes/header.php';
                     <div id="entreprise_fields" style="display: none;">
                         <div class="mb-3">
                             <label for="nom_entreprise" class="form-label">Nom de l'Entreprise <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="nom_entreprise" name="nom_entreprise">
+                            <input type="text" class="form-control" id="nom_entreprise" name="nom_entreprise" required>
                         </div>
                         
                         <div class="mb-3">
@@ -255,15 +261,18 @@ function toggleClientType() {
     const personneFields = document.getElementById('personne_fields');
     const entrepriseFields = document.getElementById('entreprise_fields');
     const nomEntreprise = document.getElementById('nom_entreprise');
+    const nom = document.getElementById('nom');
     
     if (typePersonne) {
         personneFields.style.display = 'block';
         entrepriseFields.style.display = 'none';
         nomEntreprise.removeAttribute('required');
+        nom.setAttribute('required', 'required');
     } else {
         personneFields.style.display = 'none';
         entrepriseFields.style.display = 'block';
         nomEntreprise.setAttribute('required', 'required');
+        nom.removeAttribute('required');
     }
 }
 

@@ -37,3 +37,7 @@ require_once '../includes/header.php';
 <div class="row"><div class="col-md-6 mx-auto"><div class="card"><div class="card-body"><form method="POST"><div class="mb-3"><label class="form-label">Montant à Payer (DH)</label><input type="number" class="form-control" name="montant" step="0.01" min="0.01" max="<?php echo $credit['montant_actuel']; ?>" required><small class="text-muted">Crédit actuel: <?php echo number_format($credit['montant_actuel'], 2); ?> DH</small></div><div class="d-grid"><button type="submit" class="btn btn-success"><i class="bi bi-cash me-2"></i>Enregistrer le Paiement</button></div></form></div></div></div></div>
 <?php require_once '../includes/footer.php'; ?>
 
+
+
+
+

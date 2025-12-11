@@ -33,3 +33,7 @@ if (isLoggedIn()) {
     echo "<p>Vous n'êtes pas connecté. <a href='login.php'>Se connecter</a></p>";
 }
 
+
+
+
+

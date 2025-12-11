@@ -18,7 +18,26 @@ $currentUser = getCurrentUser();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo htmlspecialchars($pageTitle); ?> - GDS NURYASS</title>
+    <title><?php echo htmlspecialchars($pageTitle); ?> - NURYASS</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#764ba2">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="GDS NURYASS">
+    <meta name="description" content="Système de gestion de stock, bons, factures et crédits clients pour NURYASS">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="<?php echo url('manifest.json'); ?>">
+    
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" href="<?php echo url('images/icon-192x192.png'); ?>">
+    <link rel="apple-touch-icon" sizes="152x152" href="<?php echo url('images/icon-152x152.png'); ?>">
+    <link rel="apple-touch-icon" sizes="180x180" href="<?php echo url('images/icon-192x192.png'); ?>">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="<?php echo url('images/icon-96x96.png'); ?>">
+    <link rel="icon" type="image/png" sizes="16x16" href="<?php echo url('images/icon-96x96.png'); ?>">
     
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -54,18 +73,41 @@ $currentUser = getCurrentUser();
         .sidebar-header {
             padding: 25px 20px;
             border-bottom: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+        }
+        
+        .sidebar-header .logo-container {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+        }
+        
+        .sidebar-header .logo-img {
+            max-width: 180px;
+            max-height: 120px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            margin: 0;
+            padding: 0;
         }
         
         .sidebar-header h4 {
             margin: 0;
+            padding: 0;
+            margin-left: 5px;
             font-weight: 600;
-            font-size: 22px;
+            font-size: 28px;
+            color: white;
         }
         
         .sidebar-header p {
             margin: 5px 0 0 0;
             font-size: 12px;
             opacity: 0.8;
+            display: none;
         }
         
         .sidebar-menu {
@@ -296,8 +338,21 @@ $currentUser = getCurrentUser();
     <!-- Sidebar -->
     <div class="sidebar">
         <div class="sidebar-header">
-            <h4><i class="bi bi-box-seam me-2"></i>GDS NURYASS</h4>
-            <p>Gestion de Stock</p>
+            <div class="logo-container">
+                <?php 
+                $logoPath = url('images/logo.png');
+                $logoExists = file_exists(__DIR__ . '/../images/logo.png');
+                if ($logoExists): 
+                ?>
+                    <img src="<?php echo $logoPath; ?>" alt="NURYASS Logo" class="logo-img">
+                <?php else: ?>
+                    <!-- Logo par défaut si l'image n'existe pas -->
+                    <div style="width: 120px; height: 120px; background: rgba(255,255,255,0.2); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                        <i class="bi bi-building" style="font-size: 60px;"></i>
+                    </div>
+                <?php endif; ?>
+                <h4>NURYASS</h4>
+            </div>
         </div>
         
         <nav class="sidebar-menu">
@@ -356,6 +411,18 @@ $currentUser = getCurrentUser();
                 <span>Couleurs</span>
             </a>
             <?php endif; ?>
+            
+            <!-- Install PWA Button (hidden by default) -->
+            <a href="#" class="nav-link" id="install-pwa-btn" style="display: none; visibility: hidden;">
+                <i class="bi bi-download"></i>
+                <span>Installer l'application</span>
+            </a>
+            
+            <!-- Link to diagnostic if button doesn't appear -->
+            <a href="<?php echo url('pwa-install-diagnostic.php'); ?>" class="nav-link">
+                <i class="bi bi-question-circle"></i>
+                <span>Aide Installation</span>
+            </a>
             
             <!-- Settings Menu -->
             <div class="settings-menu">

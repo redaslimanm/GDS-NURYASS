@@ -42,3 +42,7 @@ require_once '../includes/header.php';
 <div class="card"><div class="card-body p-0"><?php if (empty($factures)): ?><div class="text-center py-5"><p class="text-muted">Aucune facture</p><a href="create.php" class="btn btn-primary">Créer la première</a></div><?php else: ?><div class="table-responsive"><table class="table table-hover mb-0"><thead class="table-light"><tr><th>N°</th><th>Client</th><th>Date</th><th>Total</th><th>Créée par</th><th>Actions</th></tr></thead><tbody><?php foreach ($factures as $facture): ?><tr><td><strong>#<?php echo htmlspecialchars($facture['numero_facture']); ?></strong></td><td><?php echo htmlspecialchars($facture['type_client'] === 'entreprise' ? ($facture['nom_entreprise'] ?? $facture['nom']) : ($facture['nom'] . ' ' . ($facture['prenom'] ?? ''))); ?></td><td><?php echo date('d/m/Y', strtotime($facture['date_facture'])); ?></td><td><strong><?php echo number_format($facture['total'], 2); ?> DH</strong></td><td><small><?php echo htmlspecialchars($facture['username'] ?? '-'); ?></small></td><td><a href="view.php?id=<?php echo $facture['id']; ?>" class="btn btn-sm btn-outline-info"><i class="bi bi-eye"></i></a> <a href="pdf.php?id=<?php echo $facture['id']; ?>" class="btn btn-sm btn-outline-danger" target="_blank"><i class="bi bi-file-pdf"></i></a></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?></div></div>
 <?php require_once '../includes/footer.php'; ?>
 
+
+
+
+

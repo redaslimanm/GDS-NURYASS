@@ -38,3 +38,7 @@ require_once '../includes/header.php';
 <div class="card"><div class="card-body p-0"><?php if (empty($credits)): ?><div class="text-center py-5"><p class="text-muted">Aucun crédit actif</p></div><?php else: ?><div class="table-responsive"><table class="table table-hover mb-0"><thead class="table-light"><tr><th>Client</th><th>Crédit Actuel</th><th>Maximum</th><th>%</th><th>Actions</th></tr></thead><tbody><?php foreach ($credits as $credit): $pourcentage = $credit['max_montant'] > 0 ? ($credit['montant_actuel'] / $credit['max_montant']) * 100 : 0; ?><tr><td><?php echo htmlspecialchars($credit['type_client'] === 'entreprise' ? ($credit['nom_entreprise'] ?? $credit['nom']) : ($credit['nom'] . ' ' . ($credit['prenom'] ?? ''))); ?></td><td><strong><?php echo number_format($credit['montant_actuel'], 2); ?> DH</strong></td><td><?php echo number_format($credit['max_montant'], 2); ?> DH</td><td><div class="progress" style="height: 20px;"><div class="progress-bar bg-<?php echo $pourcentage >= 80 ? 'danger' : ($pourcentage >= 50 ? 'warning' : 'success'); ?>" style="width: <?php echo min(100, $pourcentage); ?>%"><?php echo number_format($pourcentage, 1); ?>%</div></div></td><td><a href="view.php?id=<?php echo $credit['id']; ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a> <a href="paiement.php?id=<?php echo $credit['id']; ?>" class="btn btn-sm btn-outline-success"><i class="bi bi-cash"></i></a></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?></div></div>
 <?php require_once '../includes/footer.php'; ?>
 
+
+
+
+

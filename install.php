@@ -195,3 +195,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$installed) {
 </body>
 </html>
 
+
+
+
+

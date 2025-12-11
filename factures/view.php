@@ -25,3 +25,7 @@ require_once '../includes/header.php';
 <div class="row"><div class="col-md-8"><div class="card"><div class="card-body"><h5>Client</h5><p><?php echo htmlspecialchars($facture['type_client'] === 'entreprise' ? ($facture['nom_entreprise'] ?? $facture['nom']) : ($facture['nom'] . ' ' . ($facture['prenom'] ?? ''))); ?></p><h5>Produits</h5><table class="table"><thead><tr><th>Produit</th><th>Qté</th><th>Prix</th><th>Total</th></tr></thead><tbody><?php foreach ($details as $detail): ?><tr><td><?php echo htmlspecialchars($detail['nom_produit']); ?></td><td><?php echo $detail['quantite']; ?></td><td><?php echo number_format($detail['prix_unitaire'], 2); ?> DH</td><td><?php echo number_format($detail['sous_total'], 2); ?> DH</td></tr><?php endforeach; ?></tbody><tfoot><tr><th colspan="3">Total</th><th><?php echo number_format($facture['total'], 2); ?> DH</th></tr></tfoot></table></div></div></div></div>
 <?php require_once '../includes/footer.php'; ?>
 
+
+
+
+
